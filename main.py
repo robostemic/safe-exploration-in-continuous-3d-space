@@ -20,10 +20,17 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
         
         self.gate_x = 1.5
         self.max_episode_steps = 350
+
         self.door_object_ids = []
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(24,), dtype=np.float32)
 
     def _build_door_geometry(self, client_id):
+        if len(self.door_object_ids) > 0:
+            try:
+                p.getBodyInfo(self.door_object_ids[0], physicsClientId=client_id)
+            except Exception:
+                self.door_object_ids.clear()
+
         if len(self.door_object_ids) == 0:
             wall_thickness = 0.05
             wall_color = [0.9, 0.1, 0.1, 1.0]
@@ -66,7 +73,10 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
             self.door_object_ids.append(id_side_r)
 
     def reset(self, seed=None, options=None):
+        #self.door_object_ids.clear()
+
         obs_flat, info = super().reset(seed=seed, options=options)
+
         self.passed_gate = False
         self.current_step_count = 0
         
@@ -117,12 +127,16 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
                 ray_from.append(pos)
                 ray_to.append(pos + global_dir * 4.0)
 
-                results = p.rayTestBatch(ray_from, ray_to, physicsClientId=client_id)
+            results = p.rayTestBatch(ray_from, ray_to, physicsClientId=client_id)
 
-                for i, res in enumerate(results):
+            for i, res in enumerate(results):
+                # 
+                if isinstance(res, (list, tuple)) and len(res) > 2:
                     hit_fraction = res[2]
-                    lidar_distances[i] = hit_fraction * 4.0
-        
+                else:
+                    hit_fraction = res if isinstance(res, (float, int)) else 1.0
+                lidar_distances[i] = hit_fraction * 4.0
+    
         flat_obs = np.zeros(24, dtype=np.float32)
         # Telemetry
         flat_obs[0:12] = attitude[0:12]
@@ -141,8 +155,15 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
         processed_action = np.array(action, dtype=np.float32).flatten()
         processed_action = np.clip(processed_action + 0.56, 0.0, 1.0)
         processed_action[:3] = np.clip(processed_action[:3], -1.0, 1.0)
-        
-        raw_obs, _, terminated, truncated, info = super().step(processed_action)
+
+        try:
+            raw_obs, _, terminated, truncated, info = super().step(processed_action)
+        except IndexError:
+            terminated = True
+            truncated = False
+            info = {}
+            print("Internal physics matrix mismatch caught.")
+            
         self.current_step_count += 1
         
         obs_flat = self._get_custom_obs()
@@ -196,6 +217,7 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
         # Goal Reached Reward
         completion_reward = 0.0
         dist_to_final = np.linalg.norm(self.target_pos - drone_pos)
+
         if dist_to_final < 0.5:
             terminated = True
             completion_reward = 1000.0
@@ -216,6 +238,18 @@ class QuadXObstacleCourseEnv(QuadXHoverEnv):
         if self.current_step_count >= self.max_episode_steps:
             truncated = True
 
+        if hasattr(self, 'terminated'): 
+            self.terminated = terminated
+
+        if hasattr(self, 'truncated'): 
+            self.truncated = truncated
+
+        if hasattr(self, 'env') and hasattr(self.env, 'terminated'):
+            self.env.terminated = terminated
+
+        if hasattr(self, 'env') and hasattr(self.env, 'truncated'):
+            self.env.truncated = truncated
+
         total_reward = progress_reward + gate_reward + completion_reward + ceiling_penalty + survival_penalty + wall_penalty
         return obs_flat, total_reward, terminated, truncated, {}
 
@@ -231,21 +265,45 @@ def run_evaluation(name, agent_type, agent, discrete_wrapper=False, episodes=3):
         env = QuadXObstacleCourseEnv(render_mode="human")
         raw_env = env
 
-    try: 
+    client_id = None
+
+    client_id = None
+    if hasattr(raw_env, 'client_id'):
+        client_id = raw_env.client_id
+    elif hasattr(raw_env, 'env') and hasattr(raw_env.env, 'aviary'):
+        client_id = raw_env.env.aviary.client
+    elif hasattr(raw_env, 'env') and hasattr(raw_env.env, '_client'):
         client_id = raw_env.env._client
-    except Exception: 
-        client_id = getattr(raw_env, '_client', None)
+    else:
+        client_id = getattr(raw_env, '_client', getattr(getattr(raw_env, 'env', None), '_client', None))
         
+    print("="*20)
+    print("-"*20)
+    print(f"[DEBUG ENGINE]: Connected to PyBullet Client ID: {client_id}")
+    print("="*20)
+    print("-"*20)
+
     for ep in range(episodes):
         obs, info = env.reset()
         total_reward, steps = 0.0, 0
         text_id, log_id = None, None
 
+        client_id = None
+        if hasattr(raw_env, 'client_id'):
+            client_id = raw_env.client_id
+        elif hasattr(raw_env, 'env') and hasattr(raw_env.env, 'aviary'):
+            client_id = raw_env.env.aviary.client
+        elif hasattr(raw_env, 'env') and hasattr(raw_env.env, '_client'):
+            client_id = raw_env.env._client
+        else:
+            client_id = getattr(raw_env, '_client', getattr(getattr(raw_env, 'env', None), '_client', None))
+            
+        print(f"[DEBUG ENGINE - Episode {ep+1}]: Active PyBullet Client ID: {client_id}")
+
         # Recording the episodes automatically because they go by so fast
-        flat_video_name = f"video_{name}_ep{ep+1}.mp4"
-        target_dir = f"vids/{name}"
+        target_dir = os.path.abspath(f"vids/{name}")
         os.makedirs(target_dir, exist_ok=True)
-        final_video_path = f"{target_dir}/video_{name}_ep{ep+1}.mp4"
+        absolute_video_path = os.path.join(target_dir, f"video_{name}_ep{ep+1}.mp4")
         
         if client_id is not None:
             text_id = p.addUserDebugText(
@@ -257,7 +315,7 @@ def run_evaluation(name, agent_type, agent, discrete_wrapper=False, episodes=3):
             )
             log_id = p.startStateLogging(
                 loggingType=p.STATE_LOGGING_VIDEO_MP4, 
-                fileName=flat_video_name, 
+                fileName=absolute_video_path, 
                 physicsClientId=client_id
             )
             
@@ -299,12 +357,15 @@ def run_evaluation(name, agent_type, agent, discrete_wrapper=False, episodes=3):
                 try: p.removeUserDebugItem(text_id, physicsClientId=client_id)
                 except Exception: pass
                 
-        time.sleep(0.5) 
-        if os.path.exists(flat_video_name): 
-            try: os.rename(flat_video_name, final_video_path)
-            except Exception as e: print(f"Warning: Video rename failed: {e}")
+        time.sleep(0.8) 
             
     env.close()
+
+    try:
+        p.disconnect()
+        time.sleep(0.2)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
