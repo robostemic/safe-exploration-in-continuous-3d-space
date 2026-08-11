@@ -10,6 +10,8 @@
 
 [PyFlyt](https://taijunjet.com/PyFlyt/index.html) and [Gymnasium](https://gymnasium.farama.org/index.html) were used to simulate a continuous 3D environment with a single quadcopter drone for the agent and a large, red, 3D gate using the [QuadX-Hover-v4 environment](https://github.com/jjshoots/PyFlyt/blob/master/PyFlyt/gym_envs/quadx_envs/quadx_hover_env.py). Things were kept simple: The drone is enclosed on all sides by a wall (with which it can collide) and must pass through a gate to arrive at its goal.
 
+For most of the process, a simple goalpost was used. The wall, and later the corridor with gate, were added to see if more collision potential assisted algorithm performance. This iteration is currently being run; the [GitHub](https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html) will be updated as soon as it's completed. This static PDF will only have the first two main runs of the project as I want to make sure something is turned in on time.
+
 ![Example PyFlyt environment](./imgs/example_environment.png)
 
 
