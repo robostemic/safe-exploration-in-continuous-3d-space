@@ -1,5 +1,7 @@
 # Safe Exploration in Continuous 3D Space
 
+**GITHUB REPO:** https://github.com/robostemic/safe-exploration-in-continuous-3d-space
+
 ## The Problem
 
 
@@ -263,42 +265,53 @@ It relies on Soft Target Updates (tau=0.005) to blend the online network weights
 
 | Agent     | Video         | Explanation               |
 |-----------|---------------|---------------------------|
-| Random    | _insert here_ | _insert explanation here_ |
-| Heuristic | _insert here_ | _insert explanation here_ |
-| PPO       | _insert here_ | _insert explanation here_ |
-| DQN       | _insert here_ | _insert explanation here_ |
-| DPPG      | _insert here_ | _insert explanation here_ |
+| Random    | ![Random Example](./old_vids/random_example.gif) | As to be expected, random has no idea what it's doing. It not only continues to fly up but wobbles a ton as it does so. |
+| Heuristic | ![Heuristic Example](./old_vids/heuristic_example.gif) | This one was surprising. Heuristic just launched itself up without moving forward. It made me wonder if I programmed the goal or environment wrong. |
+| PPO       | ![PPO example](./old_vids/ppo.gif) | This one made me laugh. PPO's path is smooth--and in the direct opposite position from the goal-post. |
+| DQN       | ![DQN example](./old_vids/dqn_example.gif) | As expected, the DQN path is jagged. Initially, it launches itself straight up, then slowly tries to go through the goalpost--and eventually succeeds. |
+| DPPG      | N/A | Not implemented this round! |
+
+**Current Winner:** DQN performed the best of the lot. It's movements were jagged, but it was the only algorithm that successfully navigated through the goalpost.
 
 ### Mid-Run
 
+Since the Heuristic algorithm performed so poorly, I went back and refined the environment and goal-setting. During this time, I also ran across the DDPG algorithm in a paper and wanted to try and implement/compare it with the others.
+
 | Agent     | Video         | Explanation               |
 |-----------|---------------|---------------------------|
-| Random    | _insert here_ | _insert explanation here_ |
-| Heuristic | _insert here_ | _insert explanation here_ |
-| PPO       | _insert here_ | _insert explanation here_ |
-| DQN       | _insert here_ | _insert explanation here_ |
-| DPPG      | _insert here_ | _insert explanation here_ |
+| Random    | ![Random Example](./mid_vids/random_example.gif) | Bless its heart. The Random algorithm really tries, but it keeps just launching itself out of the simulation. The movement is still wobbly. |
+| Heuristic | ![Heuristic Example](./mid_vids/heuristic_example.gif) | This one confused me. Heuristic now has the opposite problem as before: It just crashes. It was at this point that I started wondering if the problem was that there weren't enough obstacles to provide information. |
+| PPO       | ![PPO Example](./mid_vids/ppo.gif) | PPO started exploiting an error in my rewards system. I punished it too harshly for time and didn't deduct points for flying out of bounds, so it would continually fly out of bounds to maximize the score. Cheeky bugger. |
+| DQN       | ![DQN Example](./mid_vids/dqn.gif) | Look at him! DQN is so close, but the change in rewards made him far too cautious. Before he was zooming up and through the goal but it took him a second. Now, he's shy. Time to mess with the rewards. |
+| DPPG      | ![DDPG Example](./mid_vids/ddpg.gif) | Look at this guy go--in the exact wrong direction!! That's my fault! I realized when I was implementing it, I accidentally inverted the signs so he's doing his best to arrive in the goal and knows where it is, but I handed him inverted controls--whoops. |
 
 ### Final Run
 
+This is the one I'm currently on. DQN has just finished training and it's working through DDPG. I'll update this on the [GitHub repo](https://github.com/robostemic/safe-exploration-in-continuous-3d-space) as soon as the evaluation is over. 
+
+This one adds the corridors (in case that's helpful for the Heuristic algorithm) and incorporates the LiDAR ray-casts (which weren't present up until this point). Controls were fixed (hopefully) for the DDPG, and the agents are now properly punished for trying to sneak over the wall (I'm looking at you PPO). Goals were broken into two parts (through the gate and then to the final goal point) and the agents are now rewarded for 
+
 | Agent     | Video         | Explanation               |
 |-----------|---------------|---------------------------|
-| Random    | _insert here_ | _insert explanation here_ |
-| Heuristic | _insert here_ | _insert explanation here_ |
-| PPO       | _insert here_ | _insert explanation here_ |
-| DQN       | _insert here_ | _insert explanation here_ |
-| DPPG      | _insert here_ | _insert explanation here_ |
+| Random    | _see GitHub repo_ | _see GitHub repo_ |
+| Heuristic | _see GitHub repo_ | _see GitHub repo_ |
+| PPO       | _see GitHub repo_ | _see GitHub repo_ |
+| DQN       | _see GitHub repo_ | _see GitHub repo_ |
+| DPPG      | _see GitHub repo_ | _see GitHub repo_ |
 
-### Random Agent Results
-
-### Heuristic Agent Results
-
-### Proximal Policy Optimization (PPO) Agent Results 
-
-### Deep-Q Learning (DQN) Agent Results
-
-### Deep Deterministic Policy Gradient (DDPG)
 
 ## Discussion 
 
-Conclusion here
+Ultimately, the DQN and DDPG algorithms seem to be the best implemented of the algorithms I tried my hand at. The heuristic algorithm--which I was sure would perform well since it's utilizing simple geometry--struggled to keep afloat (it crashed often) and would often fly out of bounds. I feel like that's got to be missing something about how PyFlyt works and borking implementation.
+
+The DQN model never flew out of bounds. Even when it took forever, the drones would find their way to the goal--which is why I started punishing time so severely. This caused the PPO model to start exploiting the out-of-bounds hack even earlier, though. 
+
+It's also cool to compare the movement with the Discrete DQN compared to the continuous random, heuristic, PPO, and DDPG models. It's easy to note DQN's discrete steps and understanding of its environment--especially compared with the smooth movement of the DDPG. The random movement of the random algorithm is easy to see through its wobbling, too, which is cool
+
+I will say, PPO probably would have performed a lot better if I didn't create it from scratch. Stable Baselines 3 has a [PPO model](https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html) that is pre-trained and would understand PyFlyt, the drone, and how to keep aflight better; all it would need to do is learn the enviornment. Since I implemented DQN, PPO, and DDPG from scratch, the agents had to learn about not crashing, the environment, goal navigation, LiDAR interpreation--everything--in the limited GPUs and time I had to offer them.
+
+All things considered, I'm excited to see what the next batch of agents is capable of. I might need to go through a few more rounds to get the out of bounds penalty right, though, since I'm watching PPO train right now and he's back to his own tricks. 
+
+Even if the next round results in no agents making it through the goal in a short amount of time, I learned a ton about Reinforcement Learning and how the dimensions for models can be a bit tricky, and the pain of waiting hours for models to train, only to realize you inverted controls and your agent is now going in the exact opposite direction as the goal.
+
+Thanks for reading through this--hope your projects were equally fun, and markedly more successful!
