@@ -10,9 +10,7 @@
 
 [PyFlyt](https://taijunjet.com/PyFlyt/index.html) and [Gymnasium](https://gymnasium.farama.org/index.html) were used to simulate a continuous 3D environment with a single quadcopter drone for the agent and a large, red, 3D gate using the [QuadX-Hover-v4 environment](https://github.com/jjshoots/PyFlyt/blob/master/PyFlyt/gym_envs/quadx_envs/quadx_hover_env.py). Things were kept simple: The drone is enclosed on all sides by a wall (with which it can collide) and must pass through a gate to arrive at its goal.
 
-For most of the process, a simple goalpost was used. The wall, and later the corridor with gate, were added to see if more collision potential assisted algorithm performance. This iteration is currently being run; the [GitHub](https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html) will be updated as soon as it's completed. This static PDF will only have the first two main runs of the project as I want to make sure something is turned in on time.
-
-![Example PyFlyt environment](./imgs/example_environment.png)
+![Example PyFlyt environment](./vids/dqn.gif)
 
 
 ## The Environment
@@ -47,7 +45,7 @@ This discrete wrapper was used for the Random and Deep-Q Learning agents. Random
 
 #### What the drones can do
 
-PyFlyt quadcopters have full 6-DoF rigid body physics: pitch, roll, yaw, climb, and fall. They can accelerate in any direction; this depends on the motor output.
+PyFlyt quadcopters have full 6-DoF rigid body physics: pitch, roll, yaw, climb, and fall. They can accelerate in any direction; this depends on the motor output. Agents in the continuous environment can move as much as they like in any direction. Discrete agents utilize a wrapper that allows them to move in discrete steps (up a certain amount, down a certain amount, left and right a certain amount).
 
 The wall and gate frame are set up to calculate collision geometry if the drones make contact with a while.
 
@@ -287,19 +285,21 @@ Since the Heuristic algorithm performed so poorly, I went back and refined the e
 | DQN       | ![DQN Example](./mid_vids/dqn.gif) | Look at him! DQN is so close, but the change in rewards made him far too cautious. Before he was zooming up and through the goal but it took him a second. Now, he's shy. Time to mess with the rewards. |
 | DPPG      | ![DDPG Example](./mid_vids/ddpg.gif) | Look at this guy go--in the exact wrong direction!! That's my fault! I realized when I was implementing it, I accidentally inverted the signs so he's doing his best to arrive in the goal and knows where it is, but I handed him inverted controls--whoops. |
 
+**Current winner:** None; they're all struggling in their own ways. I'll give it to DQN, though, since it makes the most progress towards the goal.
+
 ### Final Run
 
-This is the one I'm currently on. DQN has just finished training and it's working through DDPG. I'll update this on the [GitHub repo](https://github.com/robostemic/safe-exploration-in-continuous-3d-space) as soon as the evaluation is over. 
-
-This one adds the corridors (in case that's helpful for the Heuristic algorithm) and incorporates the LiDAR ray-casts (which weren't present up until this point). Controls were fixed (hopefully) for the DDPG, and the agents are now properly punished for trying to sneak over the wall (I'm looking at you PPO). Goals were broken into two parts (through the gate and then to the final goal point) and the agents are now rewarded for 
+To assist the heuristic algorithm, corridors were added around the gate. LiDAR ray-casts were also added to provide more information on the environment to the algorithms. Discrete controls were fixed, and the DDPG was un-inverted. Agents were more strongly punished for trying to sneak over the wall (I'm looking at you PPO). Goals were broken into two parts (through the gate and then to the final goal point) and agents are rewarded for how well they fly through the gate.
 
 | Agent     | Video         | Explanation               |
 |-----------|---------------|---------------------------|
-| Random    | _see GitHub repo_ | _see GitHub repo_ |
-| Heuristic | _see GitHub repo_ | _see GitHub repo_ |
-| PPO       | _see GitHub repo_ | _see GitHub repo_ |
-| DQN       | _see GitHub repo_ | _see GitHub repo_ |
-| DPPG      | _see GitHub repo_ | _see GitHub repo_ |
+| Random    | ![Random example](./final_vids/random.gif) | Still flies up at random; very poor performance. |
+| Heuristic | ![Heuristic example](./final_vids/heuristic.gif) | Adding the corridors didn't help heuristic too much. It's still just flying up. I'll have to look again at the algorithm. |
+| PPO       | ![PPO Example](./final_vids/ppo.gif) | That's interesting; PPO seems to struggle to learn how to keep the drone hovering. Either it's trying to end the session as soon as possible, or I messed up the gradient by adding the LiDAR features. |
+| DQN       | ![DQN Example](./final_vids/dqn.gif) | DQN succeeds! It's able to get through the gate all right. It might cut the top a bit close, but given some more training iterations, it should be able to fly through the center of the gate. |
+| DDPG      | ![DDPG Example](./final_vids/ddpg.gif) | Unfortunately, the DDPG seems to be trying the out of bounds exploit now. |
+
+**Current winner:** DQN
 
 
 ## Discussion 
@@ -312,8 +312,10 @@ It's also cool to compare the movement with the Discrete DQN compared to the con
 
 I will say, PPO probably would have performed a lot better if I didn't create it from scratch. Stable Baselines 3 has a [PPO model](https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html) that is pre-trained and would understand PyFlyt, the drone, and how to keep aflight better; all it would need to do is learn the enviornment. Since I implemented DQN, PPO, and DDPG from scratch, the agents had to learn about not crashing, the environment, goal navigation, LiDAR interpreation--everything--in the limited GPUs and time I had to offer them.
 
-All things considered, I'm excited to see what the next batch of agents is capable of. I might need to go through a few more rounds to get the out of bounds penalty right, though, since I'm watching PPO train right now and he's back to his own tricks. 
+**As of this current run, the DQN appears to be the clear winner.** If I had to guess, the reason is related to dimensionality. PPO and DDPG are operating in a continuous environment and need to learn a lot more from it than DQN does. I'm creating a custom wrapper for DQN that acts like a binning mechanism, simplifying the task for the agent quite a bit. 
 
-Even if the next round results in no agents making it through the goal in a short amount of time, I learned a ton about Reinforcement Learning and how the dimensions for models can be a bit tricky, and the pain of waiting hours for models to train, only to realize you inverted controls and your agent is now going in the exact opposite direction as the goal.
+**Next steps:** Training size will be increased as will the number of episodes (perhaps 10). I'll also look over the continuous environment and double-check my implementation of the LiDAR raycasting. It's probably not a coicindence that the DDPG started to struggle after the extra dimensions were added. 
+
+Even if I can't get PPO or DDPG through the goal in a short amount of time, I learned a ton about Reinforcement Learning and how the dimensions for models can be a bit tricky, and the pain of waiting hours for models to train, only to realize you inverted controls and your agent is now going in the exact opposite direction as the goal.
 
 Thanks for reading through this--hope your projects were equally fun, and markedly more successful!
