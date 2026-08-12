@@ -382,10 +382,10 @@ if __name__ == "__main__":
     ppo_agent = PPOAgent(state_dim, action_dim_cont)
     ddpg_agent = DDPGAgent(state_dim, action_dim_cont)
     
-    TRAIN_STEPS = 150000
+    TRAIN_STEPS = 500000
     
     if not os.path.exists(dqn_path):
-        print("Training DQN (150k steps)")
+        print("Training DQN (500k steps)")
         train_env_disc = DiscretizeActionWrapper(QuadXObstacleCourseEnv(render_mode=None))
         obs, info = train_env_disc.reset()
         
@@ -420,7 +420,7 @@ if __name__ == "__main__":
         print("DQN weights exported successfully.")
 
     if not os.path.exists(ppo_path):
-        print("Training PPO (150k steps)")
+        print("Training PPO (500k steps)")
         train_env_cont = QuadXObstacleCourseEnv(render_mode=None)
         obs, info = train_env_cont.reset()
         states, actions, log_probs, rewards, next_states, dones = [], [], [], [], [], []
@@ -469,7 +469,7 @@ if __name__ == "__main__":
         print("PPO weights exported successfully.")
 
     if not os.path.exists(ddpg_path):
-        print("Training DDPG model (150k steps)")
+        print("Training DDPG model (500k steps)")
         train_env_cont = QuadXObstacleCourseEnv(render_mode=None)
         obs, info = train_env_cont.reset()
         ep_states, ep_actions, ep_rewards, ep_next_states, ep_dones = [], [], [], [], []
